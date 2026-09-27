@@ -40,7 +40,14 @@ async def run_migrations(engine: AsyncEngine, migrations_path: str | Path) -> li
         for migration in files:
             if migration.name in applied:
                 continue
-            await connection.exec_driver_sql(migration.read_text(encoding="utf-8"))
+            sql_script = migration.read_text(encoding="utf-8")
+            raw_conn = await connection.get_raw_connection()
+            if hasattr(raw_conn, "driver_connection") and hasattr(
+                raw_conn.driver_connection, "execute"
+            ):
+                await raw_conn.driver_connection.execute(sql_script)
+            else:
+                await connection.exec_driver_sql(sql_script)
             await connection.execute(
                 text("INSERT INTO schema_migrations (version) VALUES (:version)"),
                 {"version": migration.name},

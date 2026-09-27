@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     auth0_audience: str = ""
     classifier_backend: str = "fake"
     gemini_api_key: SecretStr | None = None
-    gemini_model: str = "gemini-2.0-flash"
+    gemini_model: str = "gemini-2.5-flash"
     gemini_timeout_seconds: float = 30.0
     slack_backend: str = "fake"
     slack_enabled: bool = False

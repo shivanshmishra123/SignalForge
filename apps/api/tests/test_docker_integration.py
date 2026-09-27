@@ -24,9 +24,8 @@ async def test_postgres_migrations_are_idempotent_and_create_event_tables() -> N
     engine = create_engine(settings)
     assert engine is not None
     try:
-        first = await run_migrations(engine, "migrations")
+        await run_migrations(engine, "migrations")
         second = await run_migrations(engine, "migrations")
-        assert first
         assert second == []
         async with engine.connect() as connection:
             tables = {

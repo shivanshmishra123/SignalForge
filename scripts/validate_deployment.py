@@ -5,7 +5,8 @@ SignalForge Live Deployment Validator
 Runs end-to-end checks against a deployed SignalForge instance.
 
 Usage:
-  python scripts/validate_deployment.py --api https://signalforge-api.onrender.com --token <auth0_token>
+  python scripts/validate_deployment.py --api https://signalforge-api.onrender.com \
+    --token <auth0_token>
 
 To get a test token from Auth0 (Management API > Applications > API Explorer):
   curl -X POST https://<domain>/oauth/token \\

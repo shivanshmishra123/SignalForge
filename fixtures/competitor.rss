@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Acme updates</title>
+    <item><title>New feature</title><link>https://acme.example/news/new-feature</link></item>
+  </channel>
+</rss>

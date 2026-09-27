@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: signalforge
+          POSTGRES_USER: signalforge
+          POSTGRES_PASSWORD: signalforge
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U signalforge -d signalforge"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install backend
+        run: python -m pip install -e ".[dev]"
+      - name: Check formatting
+        run: python -m ruff format --check apps/api
+      - name: Check lint
+        run: python -m ruff check apps/api
+      - name: Run tests
+        env:
+          INTEGRATION_TESTS: "1"
+          DATABASE_URL: postgresql://signalforge:signalforge@localhost:5432/signalforge
+          REDIS_URL: redis://localhost:6379/0
+        run: python -m pytest
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install frontend
+        run: npm install
+      - name: Check and build frontend
+        run: npm run build

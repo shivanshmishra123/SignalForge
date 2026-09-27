@@ -1,0 +1,85 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: signalforge-postgres
+    environment:
+      POSTGRES_DB: signalforge
+      POSTGRES_USER: signalforge
+      POSTGRES_PASSWORD: signalforge
+    ports:
+      - "5432:5432"
+    volumes:
+      - signalforge-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U signalforge -d signalforge"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: signalforge-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - signalforge-redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: signalforge-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      REPOSITORY_BACKEND: postgres
+      DATABASE_URL: postgresql+asyncpg://signalforge:signalforge@postgres:5432/signalforge
+      QUEUE_BACKEND: redis
+      REDIS_URL: redis://redis:6379/0
+      MIGRATIONS_PATH: migrations
+      MIGRATE_ON_STARTUP: "true"
+      LOG_LEVEL: INFO
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:5173}
+      AUTH_MODE: ${AUTH_MODE:-development}
+      CLASSIFIER_BACKEND: ${CLASSIFIER_BACKEND:-fake}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      SLACK_BACKEND: ${SLACK_BACKEND:-fake}
+      SLACK_ENABLED: ${SLACK_ENABLED:-false}
+      SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN:-}
+      RATE_LIMIT_PER_MINUTE: "120"
+      FORCE_JSON_LOGGING: "true"
+    ports:
+      - "8000:8000"
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: signalforge-worker
+    command: ["python", "-m", "app.scheduler"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      REPOSITORY_BACKEND: postgres
+      DATABASE_URL: postgresql+asyncpg://signalforge:signalforge@postgres:5432/signalforge
+      QUEUE_BACKEND: redis
+      REDIS_URL: redis://redis:6379/0
+      LOG_LEVEL: INFO
+      FORCE_JSON_LOGGING: "true"
+
+volumes:
+  signalforge-postgres:
+  signalforge-redis:

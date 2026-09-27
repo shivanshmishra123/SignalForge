@@ -1,0 +1,91 @@
+services:
+  - type: web
+    name: signalforge-api
+    env: python
+    buildCommand: "pip install -e . && pip install uvicorn[standard]"
+    startCommand: "uvicorn app.main:create_app --host 0.0.0.0 --port $PORT --factory"
+    releaseCommand: "python -c \"import asyncio; from app.db.migrations import run_migrations; from app.db.session import create_engine; from app.settings import get_settings; from pathlib import Path; s=get_settings(); asyncio.run(run_migrations(create_engine(s), Path(s.migrations_path)))\""
+    healthCheckPath: /health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: REPOSITORY_BACKEND
+        value: postgres
+      - key: AUTH_MODE
+        value: production
+      - key: FORCE_JSON_LOGGING
+        value: "true"
+      - key: RATE_LIMIT_PER_MINUTE
+        value: "120"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: signalforge-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: signalforge-redis
+          property: connectionString
+      - key: MIGRATE_ON_STARTUP
+        value: "false"
+      # Configure these in the Render dashboard → Environment:
+      # AUTH0_DOMAIN, AUTH0_AUDIENCE, GEMINI_API_KEY, SLACK_BOT_TOKEN, FRONTEND_ORIGIN
+
+  - type: worker
+    name: signalforge-worker
+    env: python
+    buildCommand: "pip install -e ."
+    startCommand: "python -m app.scheduler"
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: REPOSITORY_BACKEND
+        value: postgres
+      - key: AUTH_MODE
+        value: production
+      - key: FORCE_JSON_LOGGING
+        value: "true"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: signalforge-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: signalforge-redis
+          property: connectionString
+
+  - type: cron
+    name: signalforge-retention
+    env: python
+    buildCommand: "pip install -e ."
+    schedule: "0 3 * * *"   # 03:00 UTC daily
+    startCommand: >
+      python -c "
+      import asyncio;
+      from app.retention import purge_old_snapshots;
+      from app.db.session import session_factory;
+      from app.settings import get_settings;
+      s=get_settings();
+      sf=session_factory(s);
+      asyncio.run(purge_old_snapshots(sf[1])) if sf else None
+      "
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: REPOSITORY_BACKEND
+        value: postgres
+      - key: DATABASE_URL
+        fromDatabase:
+          name: signalforge-db
+          property: connectionString
+
+databases:
+  - name: signalforge-db
+    databaseName: signalforge
+    user: signalforge_user
+    plan: starter
+
+  - type: redis
+    name: signalforge-redis
+    plan: starter

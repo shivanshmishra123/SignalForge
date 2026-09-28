@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
@@ -7,6 +8,8 @@ from fastapi import HTTPException, status
 
 from app.domains.async_utils import maybe_await
 from app.domains.crawling import CrawlRepository, CrawlRun, CrawlRunStatus, CrawlService
+
+logger = logging.getLogger(__name__)
 
 MIN_SCHEDULE_INTERVAL_MINUTES = 15
 MAX_SCHEDULE_INTERVAL_MINUTES = 10080
@@ -203,11 +206,15 @@ class CrawlOperations:
         assert self._stop_event is not None
         while not self._stop_event.is_set():
             try:
-                job = await asyncio.wait_for(self.queue.get(), timeout=0.05)
+                job = await asyncio.wait_for(self.queue.get(), timeout=1.5)
             except TimeoutError:
                 continue
             try:
                 await self.process_job(job)
+            except Exception:
+                logger.exception(
+                    "Failed to process crawl job %s", getattr(job, "run_id", "unknown")
+                )
             finally:
                 self.queue.task_done()
 

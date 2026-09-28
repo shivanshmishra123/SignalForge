@@ -267,7 +267,7 @@ class PostgresCrawlRepository:
                 CrawlRunModel.idempotency_key == idempotency_key,
             ]
             if workspace_id is not None:
-                filters.append(CrawlRunModel.workspace_id == UUID(workspace_id))
+                filters.append(CrawlRunModel.workspace_id == _workspace_id(workspace_id))
             item = await session.scalar(select(CrawlRunModel).where(*filters))
             return _run(item) if item else None
 
@@ -283,7 +283,7 @@ class PostgresCrawlRepository:
             if item is None:
                 item = CrawlRunModel(
                     id=UUID(run.id),
-                    workspace_id=UUID(run.workspace_id),
+                    workspace_id=_workspace_id(run.workspace_id),
                     source_id=UUID(run.source_id),
                     idempotency_key=run.idempotency_key,
                     status=run.status.value,
@@ -308,7 +308,7 @@ class PostgresCrawlRepository:
             session.add(
                 SourceSnapshotModel(
                     id=UUID(snapshot.id),
-                    workspace_id=UUID(snapshot.workspace_id),
+                    workspace_id=_workspace_id(snapshot.workspace_id),
                     source_id=UUID(snapshot.source_id),
                     run_id=UUID(snapshot.run_id),
                     fetched_url=snapshot.fetched_url,
@@ -355,7 +355,7 @@ class PostgresCrawlRepository:
         async with self.sessions() as session:
             filters = [SourceSnapshotModel.id == UUID(snapshot_id)]
             if workspace_id is not None:
-                filters.append(SourceSnapshotModel.workspace_id == UUID(workspace_id))
+                filters.append(SourceSnapshotModel.workspace_id == _workspace_id(workspace_id))
             item = await session.scalar(select(SourceSnapshotModel).where(*filters))
             return _snapshot(item) if item else None
 
@@ -415,7 +415,7 @@ class PostgresEventRepository:
             if item is None:
                 item = ChangeEventModel(
                     id=UUID(event.id),
-                    workspace_id=UUID(event.workspace_id),
+                    workspace_id=_workspace_id(event.workspace_id),
                     source_id=UUID(event.source_id),
                     before_snapshot_id=UUID(event.before_snapshot_id)
                     if event.before_snapshot_id
@@ -537,7 +537,7 @@ class PostgresEventRepository:
                 EventNoteModel(
                     id=UUID(note.id),
                     event_id=UUID(note.event_id),
-                    workspace_id=UUID(note.workspace_id),
+                    workspace_id=_workspace_id(note.workspace_id),
                     author_user_id=note.author_user_id,
                     body=note.body,
                     created_at=note.created_at,
@@ -614,7 +614,7 @@ class PostgresBriefingRepository:
                 select(BriefingModel).where(BriefingModel.id == UUID(briefing.id))
             )
             values = {
-                "workspace_id": UUID(briefing.workspace_id),
+                "workspace_id": _workspace_id(briefing.workspace_id),
                 "period_start": briefing.period_start,
                 "period_end": briefing.period_end,
                 "status": briefing.status,
@@ -822,7 +822,7 @@ class PostgresOperationsRepository:
             session.add(
                 CrawlScheduleModel(
                     id=UUID(schedule.id),
-                    workspace_id=UUID(schedule.workspace_id),
+                    workspace_id=_workspace_id(schedule.workspace_id),
                     source_id=UUID(schedule.source_id),
                     interval_minutes=schedule.interval_minutes,
                     active=schedule.active,
@@ -947,7 +947,7 @@ class PostgresWorkspaceRepository:
             item = await session.scalar(
                 select(Membership).where(
                     Membership.user_id == UUID(user_id),
-                    Membership.workspace_id == UUID(workspace_id),
+                    Membership.workspace_id == _workspace_id(workspace_id),
                 )
             )
             return WorkspaceRole(item.role) if item else None

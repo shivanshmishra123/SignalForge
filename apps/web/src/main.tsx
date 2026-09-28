@@ -283,12 +283,10 @@ function App() {
   useEffect(() => {
     if (!isAuthenticated) return;
     const interval = window.setInterval(() => {
-      void apiRequest<CrawlRun[]>(`/v1/workspaces/${workspaceId}/runs`)
-        .then(setRuns)
-        .catch(() => undefined);
-    }, 3000);
+      void loadMonitoringData();
+    }, 4000);
     return () => window.clearInterval(interval);
-  }, [isAuthenticated, apiRequest, workspaceId]);
+  }, [isAuthenticated, loadMonitoringData]);
 
   const submitCompetitor = async (event: FormEvent) => {
     event.preventDefault();

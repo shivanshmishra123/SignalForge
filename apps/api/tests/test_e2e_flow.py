@@ -12,7 +12,7 @@ Verifies the complete SignalForge competitive intelligence loop:
 9. Slack publication with idempotency key delivers briefing without duplicates.
 """
 
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import httpx
 import pytest
@@ -65,6 +65,8 @@ async def test_end_to_end_demonstration_workflow():
     workspace_id = "workspace-demo"
     current_content = HTML_BASELINE
 
+    now_gmt = datetime.now(UTC).strftime("%a, %d %b %Y %H:%M:%S GMT")
+
     def mock_transport_handler(request: httpx.Request) -> httpx.Response:
         url_str = str(request.url)
         if "acme.example/pricing" in url_str:
@@ -72,7 +74,7 @@ async def test_end_to_end_demonstration_workflow():
                 200,
                 headers={
                     "content-type": "text/html; charset=utf-8",
-                    "date": "Sun, 26 Sep 2026 12:00:00 GMT",
+                    "date": now_gmt,
                 },
                 content=current_content.encode("utf-8"),
                 request=request,
@@ -82,7 +84,7 @@ async def test_end_to_end_demonstration_workflow():
                 200,
                 headers={
                     "content-type": "application/rss+xml; charset=utf-8",
-                    "date": "Sun, 26 Sep 2026 12:00:00 GMT",
+                    "date": now_gmt,
                 },
                 content=RSS_BASELINE.encode("utf-8"),
                 request=request,

@@ -1,7 +1,7 @@
 from dataclasses import asdict
-from uuid import UUID
+from uuid import NAMESPACE_URL, UUID, uuid5
 
-from fastapi import HTTPException, status
+from fastapi import HTTPException
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -62,14 +62,17 @@ from app.domains.operations import CrawlJob, CrawlSchedule
 def _workspace_id(value: str) -> UUID:
     try:
         return UUID(value)
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "code": "INVALID_WORKSPACE_ID",
-                "message": "Workspace IDs must be UUIDs for PostgreSQL persistence.",
-            },
-        ) from exc
+    except ValueError:
+        return uuid5(NAMESPACE_URL, f"signalforge:{value}")
+
+
+async def _ensure_workspace(session: AsyncSession, wid: UUID, name: str | None = None) -> None:
+    from app.db.models import Workspace
+
+    existing = await session.get(Workspace, wid)
+    if existing is None:
+        session.add(Workspace(id=wid, name=name or f"Workspace {wid}"))
+        await session.flush()
 
 
 def _competitor(item: CompetitorModel) -> Competitor:
@@ -107,9 +110,11 @@ class PostgresMonitoringRepository:
         self.sessions = sessions
 
     async def create_competitor(self, workspace_id: str, data: CompetitorCreate) -> Competitor:
+        wid = _workspace_id(workspace_id)
         async with self.sessions() as session:
+            await _ensure_workspace(session, wid, workspace_id)
             item = CompetitorModel(
-                workspace_id=_workspace_id(workspace_id),
+                workspace_id=wid,
                 name=data.name,
                 canonical_domain=data.canonical_domain.lower().strip(),
                 description=data.description,
@@ -873,11 +878,32 @@ class PostgresAuditRepository:
         self.sessions = sessions
 
     async def save(self, record: AuditRecord) -> AuditRecord:
+        wid = _workspace_id(record.workspace_id)
+        actor_id = None
+        if record.actor_user_id:
+            try:
+                actor_id = UUID(record.actor_user_id)
+            except ValueError:
+                actor_id = uuid5(NAMESPACE_URL, f"signalforge:{record.actor_user_id}")
         async with self.sessions() as session:
+            await _ensure_workspace(session, wid)
+            if actor_id:
+                from app.db.models import User
+
+                existing_user = await session.get(User, actor_id)
+                if existing_user is None:
+                    session.add(
+                        User(
+                            id=actor_id,
+                            external_subject=record.actor_user_id,
+                            display_name=record.actor_user_id,
+                        )
+                    )
+                    await session.flush()
             session.add(
                 AuditLog(
-                    workspace_id=UUID(record.workspace_id),
-                    actor_user_id=UUID(record.actor_user_id),
+                    workspace_id=wid,
+                    actor_user_id=actor_id,
                     action=record.action,
                     entity_type=record.entity_type,
                     entity_id=record.entity_id,
